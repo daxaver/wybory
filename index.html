@@ -7,14 +7,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background-color: #0f0f0f;
       color: #f0f0f0;
-      font-family: 'Inter', sans-serif;
+      font-family: sans-serif;
       padding: 24px;
     }
-
     h2 {
       font-size: 16px;
       text-transform: uppercase;
@@ -22,20 +20,13 @@
       color: #888;
       margin-bottom: 12px;
     }
-
     .panel {
       background: #1a1a1a;
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 24px;
     }
-
-    /* WYBRANE PIEŚNI */
-    #lista-wybranych {
-      min-height: 60px;
-      margin-bottom: 16px;
-    }
-
+    #lista-wybranych { min-height: 60px; margin-bottom: 16px; }
     .piesn-wybrana {
       display: flex;
       align-items: center;
@@ -45,7 +36,6 @@
       margin-bottom: 8px;
       gap: 12px;
     }
-
     .handle {
       cursor: grab;
       color: #555;
@@ -53,14 +43,8 @@
       user-select: none;
       flex-shrink: 0;
     }
-
     .handle:active { cursor: grabbing; }
-
-    .piesn-wybrana span {
-      flex: 1;
-      font-size: 15px;
-    }
-
+    .piesn-wybrana span { flex: 1; font-size: 15px; }
     .btn-usun {
       background: none;
       border: none;
@@ -68,16 +52,9 @@
       cursor: pointer;
       font-size: 18px;
       padding: 0 4px;
-      flex-shrink: 0;
     }
-
     .btn-usun:hover { color: #e55; }
-
-    .przyciski-dolne {
-      display: flex;
-      gap: 10px;
-    }
-
+    .przyciski-dolne { display: flex; gap: 10px; }
     button {
       padding: 10px 20px;
       border-radius: 8px;
@@ -86,30 +63,20 @@
       font-size: 14px;
       font-weight: 600;
     }
-
-    .btn-zapisz {
-      background: #4a9eff;
-      color: white;
-      flex: 1;
-    }
-
+    .btn-zapisz { background: #4a9eff; color: white; flex: 1; }
     .btn-zapisz:hover { background: #3a8eef; }
-
-    .btn-wyczysc {
-      background: #333;
-      color: #aaa;
-    }
-
+    .btn-wyczysc { background: #333; color: #aaa; }
     .btn-wyczysc:hover { background: #444; }
-
     .btn-dodaj {
       background: #4a9eff;
       color: white;
       padding: 6px 14px;
       font-size: 13px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
     }
-
-    /* WYSZUKIWARKA */
     #szukaj {
       width: 100%;
       padding: 10px 14px;
@@ -121,10 +88,7 @@
       margin-bottom: 14px;
       outline: none;
     }
-
     #szukaj:focus { background: #333; }
-
-    /* LISTA WSZYSTKICH */
     .piesn-dostepna {
       display: flex;
       align-items: center;
@@ -134,11 +98,10 @@
       margin-bottom: 6px;
       background: #2a2a2a;
       font-size: 15px;
+      gap: 10px;
     }
-
     .piesn-dostepna:hover { background: #333; }
-
-    /* KOMUNIKAT STATUSU */
+    .piesn-dostepna span { flex: 1; }
     #status {
       text-align: center;
       font-size: 13px;
@@ -146,8 +109,6 @@
       margin-top: 8px;
       min-height: 20px;
     }
-
-    /* LINK DO DODAJ PIESN */
     .nav-link {
       display: block;
       text-align: center;
@@ -156,7 +117,6 @@
       font-size: 14px;
       margin-top: 8px;
     }
-
     .pusty {
       color: #555;
       font-size: 14px;
@@ -167,21 +127,19 @@
 </head>
 <body>
 
-  <!-- PANEL: WYBRANE PIEŚNI -->
   <div class="panel">
     <h2>Wybrane pieśni</h2>
     <div id="lista-wybranych"></div>
     <div class="przyciski-dolne">
-      <button class="btn-wyczysc" onclick="wyczyscListe()">Wyczyść</button>
-      <button class="btn-zapisz" onclick="zapiszWybor()">Zapisz</button>
+      <button class="btn-wyczysc" id="btn-wyczysc">Wyczyść</button>
+      <button class="btn-zapisz" id="btn-zapisz">Zapisz</button>
     </div>
     <div id="status"></div>
   </div>
 
-  <!-- PANEL: WSZYSTKIE PIEŚNI -->
   <div class="panel">
     <h2>Śpiewnik</h2>
-    <input type="text" id="szukaj" placeholder="Szukaj pieśni..." oninput="filtrujPiesni()">
+    <input type="text" id="szukaj" placeholder="Szukaj pieśni...">
     <div id="lista-wszystkich"></div>
   </div>
 
@@ -197,37 +155,47 @@
     let wybranePiesni = [];
     let wyborSHA = null;
 
-    // INICJALIZACJA
     async function init() {
-      await Promise.all([zaladujWszystkie(), zaladujWybrane()]);
+      ustawStatus('Ładowanie...');
+      try {
+        await zaladujWszystkie();
+      } catch(e) {
+        ustawStatus('Błąd ładowania śpiewnika: ' + e.message);
+      }
+      try {
+        await zaladujWybrane();
+      } catch(e) {
+        wyborSHA = null;
+        wybranePiesni = [];
+      }
       renderWybrane();
       renderWszystkie();
+      ustawStatus('');
     }
 
-    // POBIERZ LISTĘ WSZYSTKICH PIEŚNI
     async function zaladujWszystkie() {
       const r = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/piosenki`, {
         headers: { Authorization: `token ${TOKEN}` }
       });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       const pliki = await r.json();
       wszystkiePiesni = pliki
         .filter(p => p.type === 'file')
-        .map(p => p.name.replace('.txt', ''))
-        .sort();
+        .map(p => p.name.replace(/\.txt$/i, ''))
+        .sort((a, b) => a.localeCompare(b, 'pl'));
     }
 
-    // POBIERZ AKTUALNE WYBRANE
     async function zaladujWybrane() {
       const r = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/wybor.txt`, {
         headers: { Authorization: `token ${TOKEN}` }
       });
+      if (!r.ok) throw new Error('Brak wybor.txt');
       const data = await r.json();
       wyborSHA = data.sha;
       const tekst = atob(data.content.replace(/\n/g, ''));
       wybranePiesni = tekst.split('\n').map(l => l.trim()).filter(l => l);
     }
 
-    // RENDERUJ WYBRANE
     function renderWybrane() {
       const lista = document.getElementById('lista-wybranych');
       if (wybranePiesni.length === 0) {
@@ -235,12 +203,20 @@
         return;
       }
       lista.innerHTML = wybranePiesni.map((nazwa, i) => `
-        <div class="piesn-wybrana" data-nazwa="${nazwa}">
+        <div class="piesn-wybrana" data-nazwa="${nazwa}" data-index="${i}">
           <span class="handle">☰</span>
           <span>${nazwa}</span>
-          <button class="btn-usun" onclick="usunWybrana(${i})">✕</button>
+          <button class="btn-usun" data-index="${i}">✕</button>
         </div>
       `).join('');
+
+      lista.querySelectorAll('.btn-usun').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.index);
+          wybranePiesni.splice(i, 1);
+          renderWybrane();
+        });
+      });
 
       Sortable.create(lista, {
         handle: '.handle',
@@ -252,7 +228,6 @@
       });
     }
 
-    // RENDERUJ WSZYSTKIE / FILTROWANE
     function renderWszystkie(filtr = '') {
       const lista = document.getElementById('lista-wszystkich');
       const przefiltrowane = wszystkiePiesni.filter(n =>
@@ -262,17 +237,24 @@
         lista.innerHTML = '<div class="pusty">Brak wyników</div>';
         return;
       }
-      lista.innerHTML = przefiltrowane.map(nazwa => `
-        <div class="piesn-dostepna">
+      lista.innerHTML = przefiltrowane.map((nazwa, i) => `
+        <div class="piesn-dostepna" data-nazwa="${nazwa}">
           <span>${nazwa}</span>
-          <button class="btn-dodaj" onclick="dodajPiesn('${nazwa}')">Dodaj</button>
+          <button class="btn-dodaj">Dodaj</button>
         </div>
       `).join('');
+
+      lista.querySelectorAll('.btn-dodaj').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const nazwa = btn.closest('.piesn-dostepna').dataset.nazwa;
+          dodajPiesn(nazwa);
+        });
+      });
     }
 
-    function filtrujPiesni() {
-      renderWszystkie(document.getElementById('szukaj').value);
-    }
+    document.getElementById('szukaj').addEventListener('input', e => {
+      renderWszystkie(e.target.value);
+    });
 
     function dodajPiesn(nazwa) {
       if (!wybranePiesni.includes(nazwa)) {
@@ -284,30 +266,29 @@
       }
     }
 
-    function usunWybrana(i) {
-      wybranePiesni.splice(i, 1);
-      renderWybrane();
-    }
-
-    function wyczyscListe() {
+    document.getElementById('btn-wyczysc').addEventListener('click', () => {
       wybranePiesni = [];
       renderWybrane();
-    }
+    });
+
+    document.getElementById('btn-zapisz').addEventListener('click', zapiszWybor);
 
     async function zapiszWybor() {
       ustawStatus('Zapisywanie...');
       const zawartosc = btoa(unescape(encodeURIComponent(wybranePiesni.join('\n'))));
+      const body = {
+        message: 'Aktualizacja wyboru pieśni',
+        content: zawartosc
+      };
+      if (wyborSHA) body.sha = wyborSHA;
+
       const r = await fetch(`${API}/repos/${OWNER}/${REPO}/contents/wybor.txt`, {
         method: 'PUT',
         headers: {
           Authorization: `token ${TOKEN}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          message: 'Aktualizacja wyboru pieśni',
-          content: zawartosc,
-          sha: wyborSHA
-        })
+        body: JSON.stringify(body)
       });
       const data = await r.json();
       wyborSHA = data.content.sha;
@@ -317,7 +298,7 @@
     function ustawStatus(tekst) {
       const el = document.getElementById('status');
       el.textContent = tekst;
-      setTimeout(() => el.textContent = '', 3000);
+      if (tekst) setTimeout(() => el.textContent = '', 3000);
     }
 
     init();
